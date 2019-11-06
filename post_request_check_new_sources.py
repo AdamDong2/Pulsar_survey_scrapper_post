@@ -5,7 +5,6 @@ import csv
 import numpy as np
 import sys
 import multiprocessing as mp
-from search_param_wrapper import search_params_postprocessing
 
 class my_confirmed_sources:
     def __init__(self,source_no='',ra='',dec='',dm='',survey_search_results_atnf=[],survey_search_results_natnf=[]):
@@ -75,6 +74,7 @@ def mp_query(source,my_new_sources,ra_dec_tol,dm_tol):
     ra=my_new_sources[source][0]
     dec=my_new_sources[source][1]
     dm=my_new_sources[source][2]
+    print(source)
     my_request_params ={'RA' : ra, 'DEC': dec, 'POSTOL':ra_dec_tol,'DM':dm,'DMTOL':dm_tol}
     url = 'http://hosting.astro.cornell.edu/~deneva/tabscr/tabscr.php'
     my_request = requests.post(url,data=my_request_params)
@@ -97,7 +97,8 @@ def load_new_sources(filename,ra_dec_tol,dm_tol):
     elif 'npz' in filename:        
         print('loading new sources')
         my_new_sources = np.load(filename,allow_pickle=1)['data'].tolist()
-        Lets_go=True
+        print(my_new_sources)
+        lets_go=True
     else:
         print('please ensure the extension is correct, this python script only takes .csv and .npz files')
     if lets_go:
