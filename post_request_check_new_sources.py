@@ -5,7 +5,8 @@ import csv
 import numpy as np
 import sys
 import multiprocessing as mp
-
+import shlex,subprocess
+import re
 class my_confirmed_sources:
     def __init__(self,source_no='',ra='',dec='',dm='',survey_search_results_atnf=[],survey_search_results_natnf=[]):
         self.source_no=source_no
@@ -15,9 +16,80 @@ class my_confirmed_sources:
         self.survey_search_results_atnf=survey_search_results_atnf
         self.survey_search_results_natnf=survey_search_results_natnf
 
+def convert_to_hoursminsec(ra,dec):
+        hours_ra = ra/15
+        minutes_ra = (hours_ra-int(hours_ra))*60
+        seconds_ra = (minutes_ra-int(minutes_ra))*60
+        minutes_dec = (dec-int(dec))*60
+        seconds_dec = (minutes_dec-int(minutes_dec))*60
+        return str(int(hours_ra))+':'+str(int(minutes_ra))+':'+str(float(seconds_ra)),str(int(dec))+':'+str(int(minutes_dec))+':'+str(float(seconds_dec))    
+    
+def convert_to_deg(HHMMSSra,DDMMSSdec):
+        
+    ra = np.array(HHMMSSra.split(':',3)).astype(np.float)
+    
+    dec = np.array(DDMMSSdec.split(':',3)).astype(np.float)
+    rhh=ra[0]
+    rmm=ra[1]
+    ddd=dec[0]
+    dmm=dec[1]
+    if len(ra)==3:
+        rss=ra[2]
+    else:
+        rss=0
+    if len(dec)==3:
+        dss=dec[2]
+    else:
+        dss=0
+    ra_deg = (float(rhh)+float(rmm)/60+float(rss)/3600)*(360/24)
+    dec_deg = float(ddd)+float(dmm)/60+float(dss)/3600
+    return ra_deg,dec_deg
+
+def query_psrcat(ra,dec,dm,ra_tol=5,dec_tol=5,dm_tol=10):
+    """Summary or Description of the Function
+
+    Parameters:
+    ra (str): ra position (hh:mm:ss)
+    dec(str): dec position (dd:mm:ss)
+    dm (str): dm (m/cm^3)
+
+    Returns:
+    results(str): String containing the if the pulsar was found or not
+    """
+    #4 minutes per degree
+    ra_deg,dec_deg = convert_to_deg(ra,dec)
+    dm=float(dm)
+    ra_deg_min=ra_deg-ra_tol
+    ra_deg_max=ra_deg+ra_tol
+    dec_deg_min = dec_deg-dec_tol
+    dec_deg_max = dec_deg+dec_tol
+    #find the min and max's
+    ra_min,dec_min = convert_to_hoursminsec(ra_deg-ra_tol,dec_deg-dec_tol)
+    ra_max,dec_max = convert_to_hoursminsec(ra_deg+ra_tol,dec_deg+dec_tol)
+    dm_min = dm-dm_tol
+    dm_max= dm+dm_tol
+    #search psrcat
+    dm_str = 'DM<'+str(dm_max)+ ' && ' +'DM>'+str(dm_min)
+    ra_str = 'RAJD<'+str(ra_deg_max)+' && '+'RAJD>'+str(ra_deg_min)
+    dec_str = 'DecJD<'+str(dec_deg_max)+' && '+'DecJD>'+str(dec_deg_min)
+
+    command = './psrcat_tar/psrcat -db_file ./psrcat_tar/psrcat.db -c "name dm RAJ DECJ" -l '+'"'+dm_str+' && '+ra_str+' && '+dec_str+'"'
+    args=shlex.split(command)
+    psrcat_results = subprocess.Popen(args,
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.STDOUT)
+    results,error = psrcat_results.communicate()
+    results=results.decode('ascii')
+    #hacky way to find the last string
+    start = results.find("1")
+    end = len(results)-len('------------------------------------------------------------------------------------------------------------------------------')-3
+    results = results[start:end]
+    return results 
+
 def sort_ATNF(my_request):
     request_return=my_request.content
     my_text=my_request.text
+    #print(my_text)
     start_atnf_string = '\n------------------------------------------------------------------------------\n'
     end_atnf_string = '\n------------------------------------------------------------------------------</pre>'
     index_atnf_table_start = my_text.find(start_atnf_string)+len(start_atnf_string)
@@ -56,15 +128,15 @@ def sort_other(my_request):
 
         elif (tables_start)&(element!='DM (pc/cc)'):
             if counter==0:
-                print('Pulsar Name: '+element)
+                #print('Pulsar Name: '+element)
                 pulsar_name=element
                 counter=counter+1
             elif counter==1:
-                print('Period: '+element)
+                #print('Period: '+element)
                 period=element
                 counter=counter+1
             elif counter==2:
-                print('DM: '+element)
+                #print('DM: '+element)
                 dm=element
                 counter=0
                 non_ATNF_results.append([pulsar_name,period,dm])
@@ -74,11 +146,11 @@ def mp_query(source,my_new_sources,ra_dec_tol,dm_tol):
     ra=my_new_sources[source][0]
     dec=my_new_sources[source][1]
     dm=my_new_sources[source][2]
-    print(source)
     my_request_params ={'RA' : ra, 'DEC': dec, 'POSTOL':ra_dec_tol,'DM':dm,'DMTOL':dm_tol}
     url = 'http://hosting.astro.cornell.edu/~deneva/tabscr/tabscr.php'
     my_request = requests.post(url,data=my_request_params)
-    atnf_results=sort_ATNF(my_request)
+    #atnf_results=sort_ATNF(my_request)
+    atnf_results = query_psrcat(ra,dec,dm,dm_tol=float(dm_tol),ra_tol=float(ra_dec_tol),dec_tol=float(ra_dec_tol))
     non_atnf_results =sort_other(my_request)
     source_results = my_confirmed_sources(source_no=source,ra=ra,dec=dec,dm=dm,survey_search_results_atnf=atnf_results,survey_search_results_natnf=non_atnf_results)
     return source_results
@@ -114,10 +186,10 @@ def print_new_sources(my_associated_sources):
             #print(item.survey_search_results_natnf)
             print('NEW source found!!')
             print('*********************')
-            print('ra:'+str(item.ra)+' dec:'+str(item.dec)+' dm:'+str(item.dm)+' cluster number:'+str(item.source_no))
+            print('ra:'+str(item.ra)+' dec:'+str(item.dec)+' dm:'+str(item.dm)+' source number:'+str(item.source_no))
             print('*********************')
         else:
-            print('ra:'+str(item.ra)+' dec:'+str(item.dec)+' dm:'+str(item.dm)+' cluster number:'+str(item.source_no))
+            print('ra:'+str(item.ra)+' dec:'+str(item.dec)+' dm:'+str(item.dm)+' soruce number:'+str(item.source_no))
             print('ATNF results')
             print(item.survey_search_results_atnf)
             print('Other results')
