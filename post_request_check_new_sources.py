@@ -8,21 +8,21 @@ import multiprocessing as mp
 import shlex,subprocess
 import re
 class my_confirmed_sources:
-    def __init__(self,source_no='',ra='',dec='',dm='',survey_search_results_atnf=[],survey_search_results_natnf=[]):
+    def __init__(self,source_no='',ra='',dec='',dm='',survey_search_results_atnf=[],survey_search_results_natnf=[],chime_candidates=[]):
         self.source_no=source_no
         self.ra=ra
         self.dec=dec
         self.dm=dm
         self.survey_search_results_atnf=survey_search_results_atnf
         self.survey_search_results_natnf=survey_search_results_natnf
-
+        self.chime_candidates = chime_candidates
 def convert_to_hoursminsec(ra,dec):
-        hours_ra = ra/15
-        minutes_ra = (hours_ra-int(hours_ra))*60
-        seconds_ra = (minutes_ra-int(minutes_ra))*60
-        minutes_dec = (dec-int(dec))*60
-        seconds_dec = (minutes_dec-int(minutes_dec))*60
-        return str(int(hours_ra))+':'+str(int(minutes_ra))+':'+str(float(seconds_ra)),str(int(dec))+':'+str(int(minutes_dec))+':'+str(float(seconds_dec))    
+    hours_ra = ra/15
+    minutes_ra = (hours_ra-int(hours_ra))*60
+    seconds_ra = (minutes_ra-int(minutes_ra))*60
+    minutes_dec = (dec-int(dec))*60
+    seconds_dec = (minutes_dec-int(minutes_dec))*60
+    return str(int(hours_ra))+':'+str(int(minutes_ra))+':'+str(float(seconds_ra)),str(int(dec))+':'+str(int(minutes_dec))+':'+str(float(seconds_dec))    
     
 def convert_to_deg(HHMMSSra,DDMMSSdec):
         
@@ -85,32 +85,33 @@ def query_psrcat(ra,dec,dm,ra_tol=5,dec_tol=5,dm_tol=10):
     end = len(results)-len('------------------------------------------------------------------------------------------------------------------------------')-3
     results = results[start:end]
     return results 
+def CheckChimeCandidates(ra,dec,dm,dm_tol=10,ra_tol=10,dec_tol=10,CandidateCSV='chime_galactic_sources.csv'):
+    """Summary or Description of the Function
 
-def sort_ATNF(my_request):
-    request_return=my_request.content
-    my_text=my_request.text
-    #print(my_text)
-    start_atnf_string = '\n------------------------------------------------------------------------------\n'
-    end_atnf_string = '\n------------------------------------------------------------------------------</pre>'
-    index_atnf_table_start = my_text.find(start_atnf_string)+len(start_atnf_string)
-    index_atnf_table_end = my_text.find(end_atnf_string)
-    atnf_string=str(request_return[index_atnf_table_start:index_atnf_table_end])
-    atnf_string = " ".join(atnf_string.split())
-    atnf_string.replace("'",'')
-    reader=csv.reader(atnf_string.split('\\n'),delimiter=' ')
-    atnf_results=[]
-    for row in reader:
-        if len(row)>1:
-            for i,my_element in enumerate(row):
-                if i==2:
-                    pulsar_name=my_element
-                elif i==5:
-                    period = my_element
-                elif i==6:
-                    dm = my_element.replace("'","")
-                    #print(dm)
-            atnf_results.append([pulsar_name,period,dm])
-    return atnf_results
+    Parameters:
+    ra (str): ra position (hh:mm:ss)
+    dec(str): dec position (dd:mm:ss)
+    dm (str): dm (m/cm^3)
+    CandidateCSV (str): filepath to CandidateCSV file
+
+    Returns:
+    results(str): String containing the if the pulsar was found or not
+    """
+    matched_sources={}
+    ra,dec = convert_to_deg(ra,dec)
+    dm=float(dm)
+    with open (CandidateCSV,'r') as csvfile:
+        csv_reader = csv.reader(csvfile, delimiter=',')
+        for row in csv_reader:
+            chime_ra = float(row[1])
+            chime_dec = float(row[2])
+            chime_dm =float(row[3])
+            matched =(ra<(chime_ra+ra_tol)) & (ra>(chime_ra-ra_tol)) & (dec<(chime_dec+dec_tol)) & (dec>(chime_dec-dec_tol)) & (dm<(chime_dm+dm_tol)) & (dm>(chime_dm-dm_tol))
+            if matched:
+                matched_sources.update({float(row[0]):[chime_ra,chime_dec,chime_dm]})
+    return matched_sources
+
+
 
 def sort_other(my_request):
     request_return=my_request.content
@@ -152,7 +153,8 @@ def mp_query(source,my_new_sources,ra_dec_tol,dm_tol):
     #atnf_results=sort_ATNF(my_request)
     atnf_results = query_psrcat(ra,dec,dm,dm_tol=float(dm_tol),ra_tol=float(ra_dec_tol),dec_tol=float(ra_dec_tol))
     non_atnf_results =sort_other(my_request)
-    source_results = my_confirmed_sources(source_no=source,ra=ra,dec=dec,dm=dm,survey_search_results_atnf=atnf_results,survey_search_results_natnf=non_atnf_results)
+    chime_candidates = CheckChimeCandidates(ra,dec,dm,dm_tol=float(dm_tol),ra_tol=float(ra_dec_tol),dec_tol=float(ra_dec_tol),CandidateCSV='chime_galactic_sources.csv')
+    source_results = my_confirmed_sources(source_no=source,ra=ra,dec=dec,dm=dm,survey_search_results_atnf=atnf_results,survey_search_results_natnf=non_atnf_results,chime_candidates = chime_candidates)
     return source_results
 
 def load_new_sources(filename,ra_dec_tol,dm_tol):
@@ -181,19 +183,26 @@ def load_new_sources(filename,ra_dec_tol,dm_tol):
         print_new_sources(my_associated_sources)
 
 def print_new_sources(my_associated_sources):
+    new_sources=[]
     for item in my_associated_sources:
-        if (len(item.survey_search_results_atnf)==0) & (len(item.survey_search_results_natnf)==0):
-            #print(item.survey_search_results_natnf)
+        if (len(item.survey_search_results_atnf)==0) & (len(item.survey_search_results_natnf)==0) & (len(item.chime_candidates)==0):
             print('NEW source found!!')
             print('*********************')
             print('ra:'+str(item.ra)+' dec:'+str(item.dec)+' dm:'+str(item.dm)+' source number:'+str(item.source_no))
-            print('*********************')
-        else:
+            print('*********************\n')
+            new_sources.append({item.source_no:[item.ra,item.dec,item.dm]})
+        else:        
             print('ra:'+str(item.ra)+' dec:'+str(item.dec)+' dm:'+str(item.dm)+' soruce number:'+str(item.source_no))
             print('ATNF results')
             print(item.survey_search_results_atnf)
             print('Other results')
             print(item.survey_search_results_natnf)
+            print('Chime source')
+            print(item.chime_candidates)
+            print('\n')
+    print('\n\n New sources')
+    for item in new_sources:
+        print(item)
 
 if __name__=="__main__":
     filename=sys.argv[1]
