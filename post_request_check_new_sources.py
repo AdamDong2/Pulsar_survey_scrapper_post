@@ -7,6 +7,8 @@ import sys
 import multiprocessing as mp
 import shlex,subprocess
 import re
+import os
+import shutil
 class my_confirmed_sources:
     def __init__(self,source_no='',ra='',dec='',dm='',survey_search_results_atnf=[],survey_search_results_natnf=[],chime_candidates=[]):
         self.source_no=source_no
@@ -181,7 +183,7 @@ def load_new_sources(filename,ra_dec_tol,dm_tol):
         np.save('my_associated_sources',my_associated_sources)
         pool.close()
         print_new_sources(my_associated_sources)
-
+        
 def print_new_sources(my_associated_sources):
     new_sources=[]
     for item in my_associated_sources:
@@ -203,6 +205,14 @@ def print_new_sources(my_associated_sources):
     print('\n\n New sources')
     for item in new_sources:
         print(item)
+    root='200215_2pts_repeaters/'
+    root_folders = os.listdir(root)
+    for item in new_sources:
+        for folder in root_folders:
+            if 'C'+str(list(item.keys())[0])+'_' in folder:
+                shutil.copytree(root+folder,'200215_new_repeater/'+folder)
+
+
 
 if __name__=="__main__":
     filename=sys.argv[1]
