@@ -159,7 +159,7 @@ def mp_query(source,my_new_sources,ra_dec_tol,dm_tol):
     source_results = my_confirmed_sources(source_no=source,ra=ra,dec=dec,dm=dm,survey_search_results_atnf=atnf_results,survey_search_results_natnf=non_atnf_results,chime_candidates = chime_candidates)
     return source_results
 
-def load_new_sources(filename,ra_dec_tol,dm_tol):
+def load_new_sources(filename,ra_dec_tol,dm_tol,root):
     '''This function will plot all the new confirmed sources'''
     lets_go=False
     if 'csv' in filename:
@@ -182,9 +182,9 @@ def load_new_sources(filename,ra_dec_tol,dm_tol):
         my_associated_sources=pool.starmap(mp_query, [(source,my_new_sources,ra_dec_tol,dm_tol) for source in my_new_sources])
         np.save('my_associated_sources',my_associated_sources)
         pool.close()
-        print_new_sources(my_associated_sources)
+        print_new_sources(my_associated_sources,root)
         
-def print_new_sources(my_associated_sources):
+def print_new_sources(my_associated_sources,root):
     new_sources=[]
     for item in my_associated_sources:
         if (len(item.survey_search_results_atnf)==0) & (len(item.survey_search_results_natnf)==0) & (len(item.chime_candidates)==0):
@@ -205,12 +205,11 @@ def print_new_sources(my_associated_sources):
     print('\n\n New sources')
     for item in new_sources:
         print(item)
-    root='200215_2pts_repeaters/'
     root_folders = os.listdir(root)
     for item in new_sources:
         for folder in root_folders:
             if 'C'+str(list(item.keys())[0])+'_' in folder:
-                shutil.copytree(root+folder,'200215_new_repeater/'+folder)
+                shutil.copytree(root+folder,'new/'+folder)
 
 
 
@@ -218,6 +217,7 @@ if __name__=="__main__":
     filename=sys.argv[1]
     ra_dec_tol = sys.argv[2]
     dm_tol = sys.argv[3]
-    load_new_sources(filename,ra_dec_tol,dm_tol)
+    root_folder = sys.argv[4]
+    load_new_sources(filename,ra_dec_tol,dm_tol,root_folder)
 
 
