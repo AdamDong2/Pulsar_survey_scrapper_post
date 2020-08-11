@@ -110,7 +110,7 @@ def CheckChimeCandidates(ra,dec,dm,dm_tol=10,ra_tol=10,dec_tol=10,CandidateCSV='
             chime_dm =float(row[3])
             matched =(ra<(chime_ra+ra_tol)) & (ra>(chime_ra-ra_tol)) & (dec<(chime_dec+dec_tol)) & (dec>(chime_dec-dec_tol)) & (dm<(chime_dm+dm_tol)) & (dm>(chime_dm-dm_tol))
             if matched:
-                matched_sources.update({float(row[0]):[chime_ra,chime_dec,chime_dm]})
+                matched_sources.update({row[0]:[chime_ra,chime_dec,chime_dm]})
     return matched_sources
 
 
