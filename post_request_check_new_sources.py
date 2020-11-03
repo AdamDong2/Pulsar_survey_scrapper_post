@@ -9,6 +9,9 @@ import shlex,subprocess
 import re
 import os
 import shutil
+from astropy import units as u
+from astropy.coordinates import SkyCoord
+
 class my_confirmed_sources:
     def __init__(self,source_no='',ra='',dec='',dm='',survey_search_results_atnf=[],survey_search_results_natnf=[],chime_candidates=[]):
         self.source_no=source_no
@@ -46,6 +49,23 @@ def convert_to_deg(HHMMSSra,DDMMSSdec):
     ra_deg = (float(rhh)+float(rmm)/60+float(rss)/3600)*(360/24)
     dec_deg = float(ddd)+float(dmm)/60+float(dss)/3600
     return ra_deg,dec_deg
+
+def read_fast_sources(filename='fast.csv'):
+    name=[]
+    ra=[]
+    dec=[]
+    dm=[]
+    with open(filename) as csvfile:
+        spamreader = csv.reader(csvfile, delimiter=',')
+        for row_num,row in enumerate(spamreader):
+            if row_num>0:
+                name.append(row[0])
+                ra.append(row[1])
+                dec.append(row[2])
+                dm.append(float(row[3]))
+        coord = SkyCoord(ra,dec,unit=(u.hourangle, u.deg))
+    return coord,dm,name
+
 
 def query_psrcat(ra,dec,dm,ra_tol=5,dec_tol=5,dm_tol=10):
     """Summary or Description of the Function
@@ -87,6 +107,7 @@ def query_psrcat(ra,dec,dm,ra_tol=5,dec_tol=5,dm_tol=10):
     end = len(results)-len('------------------------------------------------------------------------------------------------------------------------------')-3
     results = results[start:end]
     return results 
+
 def CheckChimeCandidates(ra,dec,dm,dm_tol=10,ra_tol=10,dec_tol=10,CandidateCSV='chime_galactic_sources.csv'):
     """Summary or Description of the Function
 
@@ -156,6 +177,7 @@ def mp_query(source,my_new_sources,ra_dec_tol,dm_tol):
     atnf_results = query_psrcat(ra,dec,dm,dm_tol=float(dm_tol),ra_tol=float(ra_dec_tol),dec_tol=float(ra_dec_tol))
     non_atnf_results =sort_other(my_request)
     chime_candidates = CheckChimeCandidates(ra,dec,dm,dm_tol=float(dm_tol),ra_tol=float(ra_dec_tol),dec_tol=float(ra_dec_tol),CandidateCSV='chime_galactic_sources.csv')
+    np.savez('debug',atnf=atnf_results,non_atnf_results=non_atnf_results,chime_candidates=chime_candidates)
     source_results = my_confirmed_sources(source_no=source,ra=ra,dec=dec,dm=dm,survey_search_results_atnf=atnf_results,survey_search_results_natnf=non_atnf_results,chime_candidates = chime_candidates)
     return source_results
 
@@ -203,6 +225,7 @@ def print_new_sources(my_associated_sources,root):
             print(item.chime_candidates)
             print('\n')
     print('\n\n New sources')
+    np.save('new_sources',new_sources)
     for item in new_sources:
         print(item)
     root_folders = os.listdir(root)
