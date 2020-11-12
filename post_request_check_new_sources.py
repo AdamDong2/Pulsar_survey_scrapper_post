@@ -206,7 +206,7 @@ def load_new_sources(filename,ra_dec_tol,dm_tol,root):
         pool.close()
         print_new_sources(my_associated_sources,root)
         
-def print_new_sources(my_associated_sources,root):
+def print_new_sources(my_associated_sources,root=None):
     new_sources=[]
     for item in my_associated_sources:
         if (len(item.survey_search_results_atnf)==0) & (len(item.survey_search_results_natnf)==0) & (len(item.chime_candidates)==0):
@@ -228,11 +228,12 @@ def print_new_sources(my_associated_sources,root):
     np.save('new_sources',new_sources)
     for item in new_sources:
         print(item)
-    root_folders = os.listdir(root)
-    for item in new_sources:
-        for folder in root_folders:
-            if 'C'+str(list(item.keys())[0])+'_' in folder:
-                shutil.copytree(root+folder,'new/'+folder)
+    if root:
+        root_folders = os.listdir(root)
+        for item in new_sources:
+            for folder in root_folders:
+                if 'C'+str(list(item.keys())[0])+'_' in folder:
+                    shutil.copytree(root+folder,'new/'+folder)
 
 
 
@@ -240,7 +241,10 @@ if __name__=="__main__":
     filename=sys.argv[1]
     ra_dec_tol = sys.argv[2]
     dm_tol = sys.argv[3]
-    root_folder = sys.argv[4]
+    if len(sys.argv)>4:
+        root_folder = sys.argv[4]
+    else:
+        root_folder=None
     load_new_sources(filename,ra_dec_tol,dm_tol,root_folder)
 
 
