@@ -200,7 +200,7 @@ def load_new_sources(filename,ra_dec_tol,dm_tol,root):
     else:
         print('please ensure the extension is correct, this python script only takes .csv and .npz files')
     if lets_go:
-        pool=mp.Pool(100)
+        pool=mp.Pool(4)  #original no. core is 100
         my_associated_sources=pool.starmap(mp_query, [(source,my_new_sources,ra_dec_tol,dm_tol) for source in my_new_sources])
         np.save('my_associated_sources',my_associated_sources)
         pool.close()
