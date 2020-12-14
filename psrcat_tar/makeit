@@ -1,4 +1,4 @@
-#!/usr/bin/tcsh
+#!/usr/bin/bash
 #
 echo "Clean-up"
 

@@ -131,8 +131,6 @@ def compare_sources(compare,compare_dms,compare_name,mine,ra_tol,dec_tol,my_dm,f
             if np.sum(ra_bool&dec_bool&dm_bool):
                 print(str(fn[j])+' might be (ra,dec,dm match) '+str(np.array(compare_name)[i]))
 
-
-
 #coord,dm,name=read_fast_sources()
 my_coord,ra_unc,dec_unc,my_dm,file =header_localized('cluster_localize')
 coord,name,dist=readSN()
